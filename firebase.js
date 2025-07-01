@@ -1,0 +1,3 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+const firebaseConfig = { apiKey: "AIzaSyB0c6x5Cbu_LKDwwbo-yxEaFYRUhUzgrZE", authDomain: "painel-cd226.firebaseapp.com", projectId: "painel-cd226", storageBucket: "painel-cd226.appspot.com", messagingSenderId: "1052857310959", appId: "1:1052857310959:web:6bf734a49b6ac31f3b051a", measurementId: "G-PXPB7ZLV1N" }; const app = initializeApp(firebaseConfig); export const auth = getAuth(app);
