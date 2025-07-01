@@ -1,1 +1,58 @@
-<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'><title>Upload de Escala</title></head><body><h2>Painel do Administrador</h2><input type='file' id='fileInput' accept='.xlsx'><br><div id='output'></div><script src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'></script><script src='firebase.js'></script><script src='script.js'></script></body></html>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel Admin</title>
+<link rel="stylesheet" href="style.css"></head>
+<body>
+<h2>Painel do Administrador</h2>
+<button onclick="logout()">Sair</button>
+<form id="uploadForm">
+  <label>Planilha Excel (.xlsx):<input type="file" id="fileInput" accept=".xlsx" required></label>
+  <button type="submit">Enviar</button>
+</form>
+<div id="status"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+<script src="firebase.js"></script>
+<script>
+if (localStorage.getItem("adminLogado") !== "true") {
+  window.location.href = "admin-login.html";
+}
+function logout() {
+  localStorage.removeItem("adminLogado");
+  window.location.href = "admin-login.html";
+}
+const db = firebase.firestore();
+document.getElementById("uploadForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const file = document.getElementById("fileInput").files[0];
+  const reader = new FileReader();
+  reader.onload = evt => {
+    const workbook = XLSX.read(evt.target.result, {type: "binary"});
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(sheet, {defval: ""});
+    let batch = db.batch(), count = 0;
+    data.forEach((row, i) => {
+      const nome = row["Nome Cooperado"];
+      if (!nome) return;
+      const ref = db.collection("escalas").doc(nome + "_" + i);
+      batch.set(ref, {
+        cooperado: nome,
+        data: row["Data"],
+        turno: row["Turno"],
+        horario: row["Horário"],
+        contrato: row["Nome Contrato"],
+        timestamp: Date.now()
+      });
+      count++;
+    });
+    batch.commit().then(() => {
+      document.getElementById("status").textContent = `${count} registros enviados.`;
+    });
+  };
+  reader.readAsBinaryString(file);
+});
+</script>
+</body>
+</html>
