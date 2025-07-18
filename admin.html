@@ -1,58 +1,222 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Painel Admin</title>
-<link rel="stylesheet" href="style.css"></head>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Ficha de Temperatura dos Motoboys - DNACenter</title>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f3f7fc;
+      padding: 20px;
+    }
+    h2 {
+      color: royalblue;
+    }
+    .box {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px #ccc;
+      margin-bottom: 30px;
+    }
+    input, select {
+      padding: 8px;
+      margin: 5px;
+    }
+    button {
+      padding: 8px 16px;
+      background: royalblue;
+      color: white;
+      border: none;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    .motoboy-card {
+      border: 1px solid #ddd;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 5px;
+      background: #fff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background: #eee;
+    }
+    #logo {
+      width: 150px;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
 <body>
-<h2>Painel do Administrador</h2>
-<button onclick="logout()">Sair</button>
-<form id="uploadForm">
-  <label>Planilha Excel (.xlsx):<input type="file" id="fileInput" accept=".xlsx" required></label>
-  <button type="submit">Enviar</button>
-</form>
-<div id="status"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
-<script src="firebase.js"></script>
-<script>
-if (localStorage.getItem("adminLogado") !== "true") {
-  window.location.href = "admin-login.html";
-}
-function logout() {
-  localStorage.removeItem("adminLogado");
-  window.location.href = "admin-login.html";
-}
-const db = firebase.firestore();
-document.getElementById("uploadForm").addEventListener("submit", e => {
-  e.preventDefault();
-  const file = document.getElementById("fileInput").files[0];
-  const reader = new FileReader();
-  reader.onload = evt => {
-    const workbook = XLSX.read(evt.target.result, {type: "binary"});
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const data = XLSX.utils.sheet_to_json(sheet, {defval: ""});
-    let batch = db.batch(), count = 0;
-    data.forEach((row, i) => {
-      const nome = row["Nome Cooperado"];
-      if (!nome) return;
-      const ref = db.collection("escalas").doc(nome + "_" + i);
-      batch.set(ref, {
-        cooperado: nome,
-        data: row["Data"],
-        turno: row["Turno"],
-        horario: row["Horário"],
-        contrato: row["Nome Contrato"],
-        timestamp: Date.now()
+
+  <img src="logo.png" id="logo" alt="Logo DNACenter" />
+  <h2>Ficha de Temperatura dos Motoboys – DNACenter</h2>
+
+  <div class="box">
+    <h3>Cadastro de Motoboy</h3>
+    <input type="text" id="nomeMotoboy" placeholder="Nome do motoboy" />
+    <input type="text" id="termometro" placeholder="Nº do termômetro" />
+    <button onclick="cadastrarMotoboy()">Cadastrar</button>
+  </div>
+
+  <div class="box">
+    <h3>Motoboys Cadastrados</h3>
+    <div id="listaMotoboys"></div>
+  </div>
+
+  <div class="box">
+    <h3>Filtros</h3>
+    <label>Data Início:</label><input type="date" id="dataInicio" />
+    <label>Data Fim:</label><input type="date" id="dataFim" />
+    <label>Motoboy:</label>
+    <select id="filtroMotoboy">
+      <option value="todos">Todos</option>
+    </select>
+    <button onclick="filtrarRegistros()">Filtrar</button>
+    <button onclick="exportarExcel()">Exportar Excel</button>
+  </div>
+
+  <div class="box">
+    <h3>Registros Filtrados</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Motoboy</th>
+          <th>Data</th>
+          <th>Hora Envio</th>
+          <th>Temp. Envio (°C)</th>
+          <th>Local Envio</th>
+          <th>Responsável Envio</th>
+          <th>Hora Recebimento</th>
+          <th>Temp. Recebida (°C)</th>
+          <th>Responsável Recebimento</th>
+          <th>Local Recebido</th>
+          <th>Duração (min)</th>
+        </tr>
+      </thead>
+      <tbody id="tabelaRegistros">
+        <tr><td colspan="11">Nenhum registro encontrado.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    let motoboys = JSON.parse(localStorage.getItem("motoboys")) || [];
+    let registros = JSON.parse(localStorage.getItem("registros")) || [];
+
+    function cadastrarMotoboy() {
+      const nome = document.getElementById("nomeMotoboy").value.trim();
+      const termo = document.getElementById("termometro").value.trim();
+      if (!nome || !termo) {
+        alert("Preencha todos os campos!");
+        return;
+      }
+      motoboys.push({ nome, termometro: termo });
+      localStorage.setItem("motoboys", JSON.stringify(motoboys));
+      document.getElementById("nomeMotoboy").value = "";
+      document.getElementById("termometro").value = "";
+      atualizarMotoboys();
+    }
+
+    function atualizarMotoboys() {
+      const lista = document.getElementById("listaMotoboys");
+      const filtro = document.getElementById("filtroMotoboy");
+      lista.innerHTML = "";
+      filtro.innerHTML = '<option value="todos">Todos</option>';
+      motoboys.forEach(m => {
+        const div = document.createElement("div");
+        div.className = "motoboy-card";
+        const link = `${window.location.origin}/form.html?id=${encodeURIComponent(m.nome)}`;
+        div.innerHTML = `
+          <strong>${m.nome}</strong><br>
+          Termômetro: ${m.termometro}<br>
+          <small>Link: <a href="${link}" target="_blank">${link}</a></small><br>
+          <canvas id="qr-${m.nome}"></canvas>
+        `;
+        lista.appendChild(div);
+        QRCode.toCanvas(document.getElementById("qr-" + m.nome), link);
+        filtro.innerHTML += `<option value="${m.nome}">${m.nome}</option>`;
       });
-      count++;
-    });
-    batch.commit().then(() => {
-      document.getElementById("status").textContent = `${count} registros enviados.`;
-    });
-  };
-  reader.readAsBinaryString(file);
-});
-</script>
+    }
+
+    function filtrarRegistros() {
+      const inicio = document.getElementById("dataInicio").value;
+      const fim = document.getElementById("dataFim").value;
+      const motoboySelecionado = document.getElementById("filtroMotoboy").value;
+
+      const tabela = document.getElementById("tabelaRegistros");
+      tabela.innerHTML = "";
+
+      const filtrados = registros.filter(r => {
+        const dataR = r.data.split("T")[0];
+        const dentroData = (!inicio || dataR >= inicio) && (!fim || dataR <= fim);
+        const mesmoMotoboy = motoboySelecionado === "todos" || r.motoboy === motoboySelecionado;
+        return dentroData && mesmoMotoboy;
+      });
+
+      if (filtrados.length === 0) {
+        tabela.innerHTML = "<tr><td colspan='11'>Nenhum registro encontrado.</td></tr>";
+        return;
+      }
+
+      filtrados.forEach(r => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${r.motoboy}</td>
+          <td>${r.data.split("T")[0]}</td>
+          <td>${r.horaEnvio || ""}</td>
+          <td>${r.tempEnvio || ""}</td>
+          <td>${r.localEnvio || ""}</td>
+          <td>${r.respEnvio || ""}</td>
+          <td>${r.horaReceb || ""}</td>
+          <td>${r.tempReceb || ""}</td>
+          <td>${r.respReceb || ""}</td>
+          <td>${r.localReceb || ""}</td>
+          <td>${r.duracaoMin || ""}</td>
+        `;
+        tabela.appendChild(tr);
+      });
+    }
+
+    function exportarExcel() {
+      const porMotoboy = {};
+      registros.forEach(r => {
+        if (!porMotoboy[r.motoboy]) porMotoboy[r.motoboy] = [];
+        porMotoboy[r.motoboy].push({
+          "Data": r.data.split("T")[0],
+          "Hora Envio": r.horaEnvio || "",
+          "Temp. Envio (°C)": r.tempEnvio || "",
+          "Local Envio": r.localEnvio || "",
+          "Responsável Envio": r.respEnvio || "",
+          "Hora Recebimento": r.horaReceb || "",
+          "Temp. Recebida (°C)": r.tempReceb || "",
+          "Responsável Recebimento": r.respReceb || "",
+          "Local Recebido": r.localReceb || "",
+          "Duração (min)": r.duracaoMin || ""
+        });
+      });
+
+      const wb = XLSX.utils.book_new();
+      for (let nome in porMotoboy) {
+        const ws = XLSX.utils.json_to_sheet(porMotoboy[nome]);
+        XLSX.utils.book_append_sheet(wb, ws, nome);
+      }
+      XLSX.writeFile(wb, "Registros_Temperatura.xlsx");
+    }
+
+    atualizarMotoboys();
+  </script>
 </body>
 </html>

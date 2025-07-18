@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Ficha de Temperatura - DNACenter</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f3f7fc;
+      padding: 20px;
+    }
+    .box {
+      background: white;
+      padding: 25px;
+      border-radius: 10px;
+      max-width: 500px;
+      margin: auto;
+      box-shadow: 0 0 10px #ccc;
+    }
+    h2 {
+      color: royalblue;
+      text-align: center;
+    }
+    label {
+      font-weight: bold;
+      display: block;
+      margin-top: 10px;
+    }
+    input, select {
+      width: 100%;
+      padding: 8px;
+      margin-top: 4px;
+      margin-bottom: 10px;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      background-color: royalblue;
+      color: white;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    .alerta {
+      color: red;
+      font-weight: bold;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="box">
+    <img src="logo.png" alt="Logo DNACenter" style="width: 120px; display: block; margin: auto;" />
+    <h2>Ficha de Temperatura</h2>
+
+    <p><strong>Motoboy:</strong> <span id="motoboyNome"></span></p>
+
+    <label for="tipo">Tipo de Registro</label>
+    <select id="tipo" onchange="mostrarFormulario()">
+      <option value="">Selecione</option>
+      <option value="Enviando">Enviando</option>
+      <option value="Recebendo">Recebendo</option>
+    </select>
+
+    <div id="formularioCampos"></div>
+
+    <button onclick="salvar()">Salvar Registro</button>
+    <div id="mensagemTemp"></div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const motoboy = params.get("id") || "Desconhecido";
+    document.getElementById("motoboyNome").textContent = motoboy;
+    const registros = JSON.parse(localStorage.getItem("registros")) || [];
+
+    function mostrarFormulario() {
+      const tipo = document.getElementById("tipo").value;
+      const campos = document.getElementById("formularioCampos");
+      campos.innerHTML = "";
+      document.getElementById("mensagemTemp").innerHTML = "";
+
+      if (tipo === "Enviando") {
+        const agora = new Date().toLocaleTimeString("pt-BR");
+        campos.innerHTML = `
+          <label>Hora do Envio</label>
+          <input type="text" id="horaEnvio" value="${agora}" readonly>
+          <label>Responsável pelo Envio</label>
+          <input type="text" id="respEnvio">
+          <label>Temperatura (°C)</label>
+          <input type="number" id="tempEnvio" oninput="verificarTemp(this.value)">
+          <label>Local de Envio</label>
+          <input type="text" id="localEnvio">
+        `;
+      }
+
+      if (tipo === "Recebendo") {
+        const pendentes = registros.filter(r => r.motoboy === motoboy && !r.horaReceb);
+        if (pendentes.length === 0) {
+          campos.innerHTML = "<p>Não há envios pendentes para esse motoboy.</p>";
+          return;
+        }
+
+        const agora = new Date().toLocaleTimeString("pt-BR");
+        let lista = "";
+        pendentes.forEach((r, i) => {
+          lista += `
+            <label><input type="checkbox" name="recebidos" value="${i}"> ${r.localEnvio} - ${r.horaEnvio}</label><br>
+          `;
+        });
+
+        campos.innerHTML = `
+          <label>Hora do Recebimento</label>
+          <input type="text" id="horaReceb" value="${agora}" readonly>
+          <label>Responsável pelo Recebimento</label>
+          <input type="text" id="respReceb">
+          <label>Temperatura Recebida (°C)</label>
+          <input type="number" id="tempReceb" oninput="verificarTemp(this.value)">
+          <label>Local onde recebeu</label>
+          <input type="text" id="localReceb">
+          <label>Quais locais está recebendo agora?</label>
+          ${lista}
+        `;
+      }
+    }
+
+    function verificarTemp(temp) {
+      const alerta = document.getElementById("mensagemTemp");
+      if (parseFloat(temp) > 15) {
+        alerta.innerHTML = `<div class="alerta">⚠️ Temperatura acima do ideal. Verifique o gelo da caixa. Caso já tenha trocado, desconsidere.</div>`;
+      } else {
+        alerta.innerHTML = "";
+      }
+    }
+
+    function salvar() {
+      const tipo = document.getElementById("tipo").value;
+      const agoraISO = new Date().toISOString();
+
+      if (tipo === "Enviando") {
+        const novo = {
+          motoboy,
+          tipo: "Enviando",
+          data: agoraISO,
+          horaEnvio: document.getElementById("horaEnvio").value,
+          respEnvio: document.getElementById("respEnvio").value,
+          tempEnvio: parseFloat(document.getElementById("tempEnvio").value),
+          localEnvio: document.getElementById("localEnvio").value
+        };
+        registros.push(novo);
+      }
+
+      if (tipo === "Recebendo") {
+        const marcados = [...document.querySelectorAll("input[name='recebidos']:checked")];
+        if (marcados.length === 0) {
+          alert("Marque ao menos um envio que está recebendo agora.");
+          return;
+        }
+
+        const horaReceb = document.getElementById("horaReceb").value;
+        const tempReceb = parseFloat(document.getElementById("tempReceb").value);
+        const respReceb = document.getElementById("respReceb").value;
+        const localReceb = document.getElementById("localReceb").value;
+
+        marcados.forEach(cb => {
+          const idx = parseInt(cb.value);
+          const envio = registros[idx];
+          registros[idx].horaReceb = horaReceb;
+          registros[idx].tempReceb = tempReceb;
+          registros[idx].respReceb = respReceb;
+          registros[idx].localReceb = localReceb;
+
+          // Cálculo da duração
+          const h1 = envio.horaEnvio.split(":").map(Number);
+          const h2 = horaReceb.split(":").map(Number);
+          const minutos = ((h2[0] * 60 + h2[1]) - (h1[0] * 60 + h1[1]));
+          registros[idx].duracaoMin = minutos > 0 ? minutos : "";
+        });
+      }
+
+      localStorage.setItem("registros", JSON.stringify(registros));
+      alert("Registro salvo com sucesso!");
+      window.location.reload();
+    }
+  </script>
+</body>
+</html>
