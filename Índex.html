@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Login - Ficha de Temperatura DNACenter</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f3f7fc;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .login-box {
+      background: white;
+      padding: 40px;
+      border-radius: 10px;
+      box-shadow: 0px 0px 12px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      width: 320px;
+    }
+    .login-box img {
+      width: 120px;
+      margin-bottom: 15px;
+    }
+    .login-box h2 {
+      color: royalblue;
+      margin-bottom: 25px;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      font-size: 15px;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      background-color: royalblue;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 15px;
+      font-weight: bold;
+      font-size: 16px;
+    }
+    button:hover {
+      background-color: #274aa6;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <img src="logo.png" alt="Logo DNACenter" />
+    <h2>Ficha de Temperatura<br><small style="font-size: 15px;">DNACenter</small></h2>
+
+    <input type="text" id="user" placeholder="Usuário" />
+    <input type="password" id="pass" placeholder="Senha" />
+    <button onclick="login()">Entrar</button>
+  </div>
+
+  <script>
+    function login() {
+      const user = document.getElementById("user").value.trim().toLowerCase();
+      const pass = document.getElementById("pass").value.trim();
+
+      if (user === "dnacenter" && pass === "84253700") {
+        window.location.href = "admin.html";
+      } else {
+        alert("Usuário ou senha incorretos.");
+      }
+    }
+  </script>
+</body>
+</html>
